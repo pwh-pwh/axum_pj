@@ -20,7 +20,7 @@ async fn api_login(cookies: Cookies, payload: Json<LoginPayload>) -> Result<Json
     if payload.username != "root" || payload.pwd != "root" {
         return Err(Error::LoginFail);
     }
-    cookies.add(Cookie::new(web::AUTH_TOKEN, "user-1:exp:sign"));
+    cookies.add(Cookie::new(web::AUTH_TOKEN, "user-1.exp.sign"));
     //todo set cookie
     let body = Json(json!({
         "result": {

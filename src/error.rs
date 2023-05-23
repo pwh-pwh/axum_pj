@@ -8,6 +8,7 @@ pub enum Error {
     LoginFail,
     TicketDeleteFailIdNotFound { id: usize },
     AuthFailNoAuthTokenCookie,
+    AuthFailTokenWrongFormat,
 }
 
 impl IntoResponse for Error {
