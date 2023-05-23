@@ -1,11 +1,15 @@
 mod ctx;
 mod error;
+mod log;
 mod model;
 mod web;
 
 pub use self::error::{Error, Result};
+use crate::ctx::Ctx;
+use crate::log::log_request;
 use crate::model::ModelController;
 use axum::extract::{Path, Query};
+use axum::http::{Method, Uri};
 use axum::middleware::map_response;
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, get_service, Route};
@@ -43,7 +47,12 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn main_response_mapper(res: Response) -> Response {
+async fn main_response_mapper(
+    ctx: Option<Ctx>,
+    uri: Uri,
+    req_method: Method,
+    res: Response,
+) -> Response {
     println!("main_response_mapper");
     let uuid = Uuid::new_v4();
     let service_error = res.extensions().get::<Error>();
@@ -59,7 +68,8 @@ async fn main_response_mapper(res: Response) -> Response {
             });
             (*status_code, Json(client_err_body)).into_response()
         });
-    println!("server log line {uuid} - Error: {service_error:?}");
+    let client_error = client_status_error.unzip().1;
+    log_request(uuid, req_method, uri, ctx, service_error, client_error).await;
     err_resp.unwrap_or(res)
 }
 
