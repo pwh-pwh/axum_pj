@@ -8,7 +8,7 @@ use axum::extract::{Path, Query};
 use axum::middleware::map_response;
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, get_service, Route};
-use axum::Router;
+use axum::{middleware, Router};
 use serde::Deserialize;
 use std::net::SocketAddr;
 use tower_cookies::CookieManagerLayer;
@@ -17,11 +17,12 @@ use tower_http::services::ServeDir;
 #[tokio::main]
 async fn main() -> Result<()> {
     let mc = ModelController::new().await?;
-
+    let routes_apis = web::routes_ticket::routes(mc.clone())
+        .layer(middleware::from_fn(web::mw_auth::mw_request_auth));
     let routes_all = Router::new()
         .merge(routes_hello())
         .merge(web::routes_login::routes())
-        .nest("/api", web::routes_ticket::routes(mc.clone()))
+        .nest("/api", routes_apis)
         .layer(map_response(main_response_mapper))
         .layer(CookieManagerLayer::new())
         .fallback_service(routes_static());
