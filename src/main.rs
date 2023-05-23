@@ -9,11 +9,13 @@ use axum::extract::{Path, Query};
 use axum::middleware::map_response;
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, get_service, Route};
-use axum::{middleware, Router};
+use axum::{middleware, Json, Router};
 use serde::Deserialize;
+use serde_json::json;
 use std::net::SocketAddr;
 use tower_cookies::CookieManagerLayer;
 use tower_http::services::ServeDir;
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -25,6 +27,10 @@ async fn main() -> Result<()> {
         .merge(web::routes_login::routes())
         .nest("/api", routes_apis)
         .layer(map_response(main_response_mapper))
+        .layer(middleware::from_fn_with_state(
+            mc.clone(),
+            web::mw_auth::mw_ctx_resolver,
+        ))
         .layer(CookieManagerLayer::new())
         .fallback_service(routes_static());
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
@@ -39,7 +45,22 @@ async fn main() -> Result<()> {
 
 async fn main_response_mapper(res: Response) -> Response {
     println!("main_response_mapper");
-    res
+    let uuid = Uuid::new_v4();
+    let service_error = res.extensions().get::<Error>();
+    let client_status_error = service_error.map(|e| e.client_status_and_error());
+    let err_resp = client_status_error
+        .as_ref()
+        .map(|(status_code, client_err)| {
+            let client_err_body = json!({
+                "error": {
+                    "type": client_err.as_ref(),
+                    "req_uuid": uuid.to_string()
+                }
+            });
+            (*status_code, Json(client_err_body)).into_response()
+        });
+    println!("server log line {uuid} - Error: {service_error:?}");
+    err_resp.unwrap_or(res)
 }
 
 #[derive(Debug, Deserialize)]
